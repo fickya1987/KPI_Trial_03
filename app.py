@@ -68,4 +68,3 @@ if uploaded_file is not None:
     # Predict and show result
     prediction = model.predict(input_df)[0]
     st.success(f"Predicted Realisasi TW Terkait: {prediction:.2f}")
-
