@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 st.title("KPI Prediction App")
 
@@ -21,30 +20,52 @@ if uploaded_file is not None:
     df['REALISASI TW TERKAIT'] = pd.to_numeric(df['REALISASI TW TERKAIT'], errors='coerce')
     df = df.dropna()
 
-    features = ['TARGET TW TERKAIT', 'BOBOT', 'POLARITAS', 'NAMA KPI', 'POSISI PEKERJA']
-    df = df[features + ['REALISASI TW TERKAIT']]
+    # Filter only necessary columns
+    df = df[['TARGET TW TERKAIT', 'BOBOT', 'POLARITAS', 'NAMA KPI', 'POSISI PEKERJA', 'REALISASI TW TERKAIT']]
+    df = df.dropna()
 
-    # Encode categorical features
-    for col in ['POLARITAS', 'NAMA KPI', 'POSISI PEKERJA']:
-        df[col] = LabelEncoder().fit_transform(df[col].astype(str))
+    # Use one-hot encoding for categorical columns
+    df_encoded = pd.get_dummies(df, columns=['POLARITAS', 'NAMA KPI', 'POSISI PEKERJA'])
 
-    X = df[features]
-    y = df['REALISASI TW TERKAIT']
+    # Define features and target
+    X = df_encoded.drop('REALISASI TW TERKAIT', axis=1)
+    y = df_encoded['REALISASI TW TERKAIT']
 
-    # Split and train
+    # Train/test split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Train model
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
 
     st.subheader("Predict New KPI Realization")
-    input_data = {
-        'TARGET TW TERKAIT': st.number_input('Target TW Terkait', value=75),
-        'BOBOT': st.number_input('Bobot KPI', value=20),
-        'POLARITAS': st.selectbox('Polaritas', df['POLARITAS'].unique()),
-        'NAMA KPI': st.selectbox('Nama KPI', df['NAMA KPI'].unique()),
-        'POSISI PEKERJA': st.selectbox('Posisi Pekerja', df['POSISI PEKERJA'].unique())
+
+    # Collect user inputs
+    target_tw = st.number_input('Target TW Terkait', value=75)
+    bobot = st.number_input('Bobot KPI', value=20)
+    polaritas = st.selectbox('Polaritas', df['POLARITAS'].unique())
+    nama_kpi = st.selectbox('Nama KPI', df['NAMA KPI'].unique())
+    posisi = st.selectbox('Posisi Pekerja', df['POSISI PEKERJA'].unique())
+
+    # Create input dataframe for prediction
+    input_dict = {
+        'TARGET TW TERKAIT': target_tw,
+        'BOBOT': bobot
     }
 
-    input_df = pd.DataFrame([input_data])
+    # Add encoded columns with 0 as default
+    for col in X.columns:
+        input_dict[col] = 0
+
+    # Set selected category to 1
+    input_dict['POLARITAS_' + polaritas] = 1
+    input_dict['NAMA KPI_' + nama_kpi] = 1
+    input_dict['POSISI PEKERJA_' + posisi] = 1
+
+    # Align input to training columns
+    input_df = pd.DataFrame([input_dict])[X.columns]
+
+    # Predict and show result
     prediction = model.predict(input_df)[0]
     st.success(f"Predicted Realisasi TW Terkait: {prediction:.2f}")
+
